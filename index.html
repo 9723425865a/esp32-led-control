@@ -145,15 +145,13 @@
         document.getElementById("panelTitle").style.display = "block";
         document.getElementById("logout").style.display = "inline-block";
         buildDashboard();
-        simulateSensorData(); // Initial call
-        setInterval(simulateSensorData, 15000); // Simulate every 15 sec
       } else {
         msg.textContent = "Invalid credentials!";
       }
     }
 
     function logout() {
-      location.reload();
+      location.reload(); // simple reset
     }
 
     function buildDashboard() {
@@ -201,44 +199,29 @@
 
     async function fetchStatus() {
       for (let i = 1; i <= ledCount; i++) {
+        // Fetch ON-OFF-Intensity from field 1-4
         try {
           const res = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i}/last.json?api_key=${readAPIKey}`);
           const js = await res.json();
           const val = js[`field${i}`] || '';
           document.getElementById(`msg${i}`).innerText = `Status: ${val}`;
-          document.getElementById(`ledStatus${i}`).className = `led-indicator ${val.includes("ON") ? "on" : "off"}`;
+          document.getElementById(`ledStatus${i}`).className = `led-indicator ${(val.includes("ON") || val.includes("on")) ? "on" : "off"}`;
         } catch {
           document.getElementById(`msg${i}`).innerText = `Status: ❌ Fetch Error`;
+          document.getElementById(`ledStatus${i}`).className = `led-indicator off`;
         }
 
+        // Fetch light sensor data from field 5-8
         try {
-          const sensor = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i + 4}/last.json?api_key=${readAPIKey}`);
+          const fieldNum = i + 4;
+          const sensor = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${fieldNum}/last.json?api_key=${readAPIKey}`);
           const js2 = await sensor.json();
-          const val2 = js2[`field${i + 4}`] || '--';
+          const val2 = js2[`field${fieldNum}`] || '--';
           document.getElementById(`sensor${i}`).innerText = `Light: ${val2}`;
         } catch {
           document.getElementById(`sensor${i}`).innerText = "Light: ❌";
         }
       }
-    }
-
-    // 🔁 Simulate Sensor Values (Random light sensor data)
-    function simulateSensorData() {
-      const fields = {
-        field5: Math.floor(Math.random() * 1000),
-        field6: Math.floor(Math.random() * 1000),
-        field7: Math.floor(Math.random() * 1000),
-        field8: Math.floor(Math.random() * 1000)
-      };
-      const params = new URLSearchParams({ api_key: writeAPIKey, ...fields });
-      fetch(`https://api.thingspeak.com/update?${params}`)
-        .then(res => res.text())
-        .then(entryID => {
-          console.log(`[Sensor Sim] Sent data to ThingSpeak, Entry ID: ${entryID}`);
-        })
-        .catch(err => {
-          console.error("❌ Sensor simulation error:", err);
-        });
     }
   </script>
 </body>
