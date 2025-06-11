@@ -1,67 +1,138 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>LED Control Panel - Secure</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart LED Dashboard</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f0f0f0;
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #a1c4fd, #c2e9fb);
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       padding: 20px;
     }
-    .hidden { display: none; }
-    .login-box, .led-card {
-      background: white;
-      padding: 20px;
-      margin: auto;
-      margin-bottom: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #ccc;
-      max-width: 400px;
+
+    h1 {
+      margin-bottom: 30px;
+      font-size: 32px;
+      color: #00557f;
     }
+
+    .login-box, .dashboard {
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      padding: 20px;
+      width: 90%;
+      max-width: 500px;
+      transition: all 0.3s ease;
+    }
+
+    .dashboard {
+      max-width: 1000px;
+      display: none;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+
     .led-card {
-      max-width: none;
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      width: 220px;
+      box-shadow: 0 0 10px #ccc;
+      transition: 0.3s;
     }
-    h1, h2 {
-      text-align: center;
+
+    .led-card:hover {
+      transform: scale(1.02);
     }
-    input, button {
-      width: 100%;
-      padding: 8px;
+
+    label {
+      display: block;
       margin-top: 10px;
-      border-radius: 5px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 6px;
+      margin-top: 4px;
+      border-radius: 6px;
       border: 1px solid #ccc;
     }
+
     button {
-      background: green;
-      color: white;
+      margin-top: 15px;
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
       border: none;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s ease;
     }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
     .status, .sensor {
       font-size: 14px;
-      margin-top: 5px;
+      margin-top: 10px;
+    }
+
+    .led-indicator {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .on { background-color: green; }
+    .off { background-color: red; }
+
+    #logout {
+      margin-top: 20px;
+      background: #dc3545;
+    }
+
+    @media screen and (max-width: 600px) {
+      .led-card {
+        width: 90%;
+      }
     }
   </style>
 </head>
 <body>
 
-  <!-- Login Page -->
-  <div id="loginPage" class="login-box">
-    <h2>Login</h2>
-    <input type="text" id="username" placeholder="Username" />
-    <input type="password" id="password" placeholder="Password" />
+  <div class="login-box" id="loginBox">
+    <h2 style="text-align: center;">🔐 Secure Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
     <button onclick="login()">Login</button>
-    <div id="loginMsg" style="color:red; text-align:center; margin-top:10px;"></div>
+    <p id="loginMsg" style="color:red; text-align:center;"></p>
   </div>
 
-  <!-- Main App -->
-  <div id="app" class="hidden">
-    <h1>LED Control Panel (Secure)</h1>
-    <div id="leds"></div>
-  </div>
+  <h1 id="panelTitle" style="display:none;">💡 LED Control Dashboard</h1>
+  <div id="dashboard" class="dashboard"></div>
+  <button id="logout" style="display:none;" onclick="logout()">🚪 Logout</button>
 
   <script>
     const allowedUser = "admin";
-    const allowedPass = "1234"; // You can change these
+    const allowedPass = "1234";
+
+    const channelID = "2986528";
+    const writeAPIKey = "A8BTENFZMSX9E6H2";
+    const readAPIKey = "PEE1E04AXJGZOILT";
+    const ledCount = 4;
 
     function login() {
       const u = document.getElementById("username").value;
@@ -69,75 +140,82 @@
       const msg = document.getElementById("loginMsg");
 
       if (u === allowedUser && p === allowedPass) {
-        document.getElementById("loginPage").style.display = "none";
-        document.getElementById("app").classList.remove("hidden");
-        initApp(); // Call the LED panel initializer
+        document.getElementById("loginBox").style.display = "none";
+        document.getElementById("dashboard").style.display = "flex";
+        document.getElementById("panelTitle").style.display = "block";
+        document.getElementById("logout").style.display = "inline-block";
+        buildDashboard();
       } else {
-        msg.textContent = "Invalid username or password!";
+        msg.textContent = "Invalid credentials!";
       }
     }
 
-    // LED Panel Script
-    const channelID = "2986528";
-    const writeAPIKey = "A8BTENFZMSX9E6H2";
-    const readAPIKey = "PEE1E04AXJGZOILT"; // optional
-    const ledCount = 4;
+    function logout() {
+      location.reload(); // simple reset
+    }
 
-    function initApp() {
-      const container = document.getElementById('leds');
-
+    function buildDashboard() {
+      const dash = document.getElementById("dashboard");
       for (let i = 1; i <= ledCount; i++) {
-        const card = document.createElement('div');
-        card.className = 'led-card';
+        const card = document.createElement("div");
+        card.className = "led-card";
         card.innerHTML = `
-          <h2>LED ${i}</h2>
-          <label>ON:</label><input type="time" id="on${i}"><br>
-          <label>OFF:</label><input type="time" id="off${i}"><br>
-          <label>Intensity:</label><input type="number" id="intensity${i}" min="0" max="255"><br>
-          <button onclick="submitData(${i})">Send</button>
+          <h3>LED ${i} <span class="led-indicator" id="ledStatus${i}"></span></h3>
+          <label>On Time</label>
+          <input type="time" id="on${i}">
+          <label>Off Time</label>
+          <input type="time" id="off${i}">
+          <label>Intensity</label>
+          <select id="intensity${i}">
+            ${[0, 50, 100, 150, 200, 255].map(val => `<option value="${val}">${val}</option>`).join("")}
+          </select>
+          <button onclick="submitData(${i})">🚀 Update</button>
           <div class="status" id="msg${i}">Status: --</div>
           <div class="sensor" id="sensor${i}">Light: --</div>
         `;
-        container.appendChild(card);
+        dash.appendChild(card);
       }
 
-      refreshStatus();
-      setInterval(refreshStatus, 5000);
+      fetchStatus();
+      setInterval(fetchStatus, 5000);
     }
 
-    function submitData(ledNum) {
-      const on = document.getElementById(`on${ledNum}`).value;
-      const off = document.getElementById(`off${ledNum}`).value;
-      const intensity = document.getElementById(`intensity${ledNum}`).value;
-      const msg = document.getElementById(`msg${ledNum}`);
+    function submitData(i) {
+      const on = document.getElementById(`on${i}`).value;
+      const off = document.getElementById(`off${i}`).value;
+      const intensity = document.getElementById(`intensity${i}`).value;
+      const msg = document.getElementById(`msg${i}`);
 
-      if (!on || !off || intensity === '') return alert('Please fill all fields');
+      if (!on || !off || intensity === '') return alert("All fields required!");
 
-      const data = `${on},${off},${intensity}`;
-      fetch(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field${ledNum}=${encodeURIComponent(data)}`)
+      const value = `${on},${off},${intensity}`;
+      fetch(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field${i}=${encodeURIComponent(value)}`)
         .then(res => res.text())
-        .then(val => msg.innerText = parseInt(val) > 0 ? 'Status: ✔ Updated' : 'Status: ✘ Failed')
-        .catch(() => msg.innerText = 'Status: ✘ Network Err');
+        .then(response => {
+          msg.innerText = parseInt(response) > 0 ? "Status: ✅ Updated" : "Status: ❌ Error";
+        })
+        .catch(() => msg.innerText = "Status: ❌ Network Error");
     }
 
-    async function refreshStatus() {
+    async function fetchStatus() {
       for (let i = 1; i <= ledCount; i++) {
         try {
           const res = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i}/last.json?api_key=${readAPIKey}`);
           const js = await res.json();
-          const val = js[`field${i}`] || '--';
-          document.getElementById(`msg${i}`).innerText = 'Status: ' + val;
+          const val = js[`field${i}`] || '';
+          document.getElementById(`msg${i}`).innerText = `Status: ${val}`;
+          document.getElementById(`ledStatus${i}`).className = `led-indicator ${val.includes("ON") ? "on" : "off"}`;
         } catch {
-          document.getElementById(`msg${i}`).innerText = 'Status: ✘ Error';
+          document.getElementById(`msg${i}`).innerText = `Status: ❌ Fetch Error`;
         }
 
         try {
-          const res2 = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i + 4}/last.json?api_key=${readAPIKey}`);
-          const js2 = await res2.json();
+          const sensor = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i + 4}/last.json?api_key=${readAPIKey}`);
+          const js2 = await sensor.json();
           const val2 = js2[`field${i + 4}`] || '--';
-          document.getElementById(`sensor${i}`).innerText = 'Light: ' + val2;
+          document.getElementById(`sensor${i}`).innerText = `Light: ${val2}`;
         } catch {
-          document.getElementById(`sensor${i}`).innerText = 'Light: ✘';
+          document.getElementById(`sensor${i}`).innerText = "Light: ❌";
         }
       }
     }
