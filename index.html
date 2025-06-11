@@ -145,13 +145,15 @@
         document.getElementById("panelTitle").style.display = "block";
         document.getElementById("logout").style.display = "inline-block";
         buildDashboard();
+        simulateSensorData(); // Initial call
+        setInterval(simulateSensorData, 15000); // Simulate every 15 sec
       } else {
         msg.textContent = "Invalid credentials!";
       }
     }
 
     function logout() {
-      location.reload(); // simple reset
+      location.reload();
     }
 
     function buildDashboard() {
@@ -218,6 +220,25 @@
           document.getElementById(`sensor${i}`).innerText = "Light: ❌";
         }
       }
+    }
+
+    // 🔁 Simulate Sensor Values (Random light sensor data)
+    function simulateSensorData() {
+      const fields = {
+        field5: Math.floor(Math.random() * 1000),
+        field6: Math.floor(Math.random() * 1000),
+        field7: Math.floor(Math.random() * 1000),
+        field8: Math.floor(Math.random() * 1000)
+      };
+      const params = new URLSearchParams({ api_key: writeAPIKey, ...fields });
+      fetch(`https://api.thingspeak.com/update?${params}`)
+        .then(res => res.text())
+        .then(entryID => {
+          console.log(`[Sensor Sim] Sent data to ThingSpeak, Entry ID: ${entryID}`);
+        })
+        .catch(err => {
+          console.error("❌ Sensor simulation error:", err);
+        });
     }
   </script>
 </body>
