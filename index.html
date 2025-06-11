@@ -1,99 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>4-LED Control Panel</title>
+  <title>4-LED Control + Live Status & Sensors</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f0f0f0;
-    }
-    .led-card {
-      background: white;
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 20px;
-      box-shadow: 0 0 10px #ccc;
-    }
-    h2 {
-      margin-bottom: 5px;
-    }
-    label {
-      display: inline-block;
-      width: 100px;
-    }
-    input {
-      margin: 5px 0;
-    }
-    button {
-      margin-top: 10px;
-      padding: 5px 15px;
-      background: green;
-      color: white;
-      border: none;
-      border-radius: 4px;
-    }
+    body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+    .led-card { background: white; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 0 10px #ccc; }
+    label { display:inline-block; width:80px; }
+    .status, .sensor { margin-top: 8px; font-size:14px; }
+    .sensor { color: #555; }
   </style>
 </head>
 <body>
-  <h1>LED Control Panel (ThingSpeak)</h1>
-
+  <h1>LED Control Panel with Live Status & Sensors</h1>
   <div id="leds"></div>
 
   <script>
     const channelID = "2986528";
     const writeAPIKey = "A8BTENFZMSX9E6H2";
+    const readAPIKey = "PEE1E04AXJGZOILT"; // if channel is private
 
     const ledCount = 4;
-
     const container = document.getElementById('leds');
+    const statusData = {}, sensorData = {};
 
+    // Build UI cards
     for (let i = 1; i <= ledCount; i++) {
       const card = document.createElement('div');
       card.className = 'led-card';
       card.innerHTML = `
         <h2>LED ${i}</h2>
-        <label>ON Time:</label><input type="time" id="on${i}" required><br>
-        <label>OFF Time:</label><input type="time" id="off${i}" required><br>
-        <label>Intensity:</label><input type="number" id="intensity${i}" min="0" max="255" required><br>
-        <button onclick="submitData(${i})">Send to ThingSpeak</button>
-        <div id="msg${i}" style="color: green; margin-top: 5px;"></div>
+        <label>ON:</label> <input type="time" id="on${i}"><br>
+        <label>OFF:</label> <input type="time" id="off${i}"><br>
+        <label>Int:</label> <input type="number" id="intensity${i}" min="0" max="255"><br>
+        <button onclick="submitData(${i})">Submit</button>
+        <div class="status" id="msg${i}">Status: N/A</div>
+        <div class="sensor" id="sensor${i}">Light: N/A</div>
       `;
       container.appendChild(card);
     }
 
+    // Send ON/OFF/Intensity settings
     function submitData(ledNum) {
       const on = document.getElementById(`on${ledNum}`).value;
       const off = document.getElementById(`off${ledNum}`).value;
       const intensity = document.getElementById(`intensity${ledNum}`).value;
-      const message = document.getElementById(`msg${ledNum}`);
+      const msg = document.getElementById(`msg${ledNum}`);
 
-      if (!on || !off || intensity === '') {
-        alert("Please fill all fields");
-        return;
-      }
+      if (!on || !off || intensity === '') return alert('Please enter all fields');
 
       const data = `${on},${off},${intensity}`;
-      const fieldName = `field${ledNum}`;
-      const url = `https://api.thingspeak.com/update?api_key=${writeAPIKey}&${fieldName}=${encodeURIComponent(data)}`;
-
-      fetch(url)
+      fetch(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field${ledNum}=${encodeURIComponent(data)}`)
         .then(res => res.text())
-        .then(response => {
-          if (parseInt(response) > 0) {
-            message.innerText = "✅ Updated successfully!";
-            message.style.color = "green";
-          } else {
-            message.innerText = "❌ Failed to update.";
-            message.style.color = "red";
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          message.innerText = "❌ Network Error.";
-          message.style.color = "red";
-        });
+        .then(v => msg.innerText = parseInt(v) > 0 ? 'Status: ✔ Updated' : 'Status: ✘ Failed')
+        .catch(() => msg.innerText = 'Status: ✘ Network Error');
     }
+
+    // Fetch latest ON/OFF/Intensity & sensor values
+    async function refreshStatus() {
+      for (let i = 1; i <= ledCount; i++) {
+        // Fetch settings
+        try {
+          const res = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i}/last.json?api_key=${readAPIKey}`);
+          const js = await res.json();
+          const val = js[`field${i}`] || 'N/A';
+          statusData[i] = val; 
+          document.getElementById(`msg${i}`).innerText = 'Status: ' + val;
+        } catch {
+          document.getElementById(`msg${i}`).innerText = 'Status: ✘ Fetch Err';
+        }
+
+        // Fetch sensor: assume sensor is on field i+4
+        try {
+          const res2 = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i + 4}/last.json?api_key=${readAPIKey}`);
+          const js2 = await res2.json();
+          const sens = js2[`field${i+4}`] || 'N/A';
+          document.getElementById(`sensor${i}`).innerText = 'Light: ' + sens;
+        } catch {
+          document.getElementById(`sensor${i}`).innerText = 'Light: ✘ Fetch Err';
+        }
+      }
+    }
+
+    // Initial load & periodic updates
+    refreshStatus();
+    setInterval(refreshStatus, 5000);
   </script>
 </body>
 </html>
