@@ -1,89 +1,146 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>4-LED Control + Live Status & Sensors</title>
+  <title>LED Control Panel - Secure</title>
   <style>
-    body { font-family: Arial; padding: 20px; background: #f0f0f0; }
-    .led-card { background: white; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 0 10px #ccc; }
-    label { display:inline-block; width:80px; }
-    .status, .sensor { margin-top: 8px; font-size:14px; }
-    .sensor { color: #555; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    .hidden { display: none; }
+    .login-box, .led-card {
+      background: white;
+      padding: 20px;
+      margin: auto;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+      max-width: 400px;
+    }
+    .led-card {
+      max-width: none;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    input, button {
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: green;
+      color: white;
+      border: none;
+    }
+    .status, .sensor {
+      font-size: 14px;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
-  <h1>LED Control Panel with Live Status & Sensors</h1>
-  <div id="leds"></div>
+
+  <!-- Login Page -->
+  <div id="loginPage" class="login-box">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <div id="loginMsg" style="color:red; text-align:center; margin-top:10px;"></div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="hidden">
+    <h1>LED Control Panel (Secure)</h1>
+    <div id="leds"></div>
+  </div>
 
   <script>
-    const channelID = "2986528";
-    const writeAPIKey = "A8BTENFZMSX9E6H2";
-    const readAPIKey = "PEE1E04AXJGZOILT"; // if channel is private
+    const allowedUser = "admin";
+    const allowedPass = "1234"; // You can change these
 
-    const ledCount = 4;
-    const container = document.getElementById('leds');
-    const statusData = {}, sensorData = {};
+    function login() {
+      const u = document.getElementById("username").value;
+      const p = document.getElementById("password").value;
+      const msg = document.getElementById("loginMsg");
 
-    // Build UI cards
-    for (let i = 1; i <= ledCount; i++) {
-      const card = document.createElement('div');
-      card.className = 'led-card';
-      card.innerHTML = `
-        <h2>LED ${i}</h2>
-        <label>ON:</label> <input type="time" id="on${i}"><br>
-        <label>OFF:</label> <input type="time" id="off${i}"><br>
-        <label>Int:</label> <input type="number" id="intensity${i}" min="0" max="255"><br>
-        <button onclick="submitData(${i})">Submit</button>
-        <div class="status" id="msg${i}">Status: N/A</div>
-        <div class="sensor" id="sensor${i}">Light: N/A</div>
-      `;
-      container.appendChild(card);
+      if (u === allowedUser && p === allowedPass) {
+        document.getElementById("loginPage").style.display = "none";
+        document.getElementById("app").classList.remove("hidden");
+        initApp(); // Call the LED panel initializer
+      } else {
+        msg.textContent = "Invalid username or password!";
+      }
     }
 
-    // Send ON/OFF/Intensity settings
+    // LED Panel Script
+    const channelID = "2986528";
+    const writeAPIKey = "A8BTENFZMSX9E6H2";
+    const readAPIKey = "PEE1E04AXJGZOILT"; // optional
+    const ledCount = 4;
+
+    function initApp() {
+      const container = document.getElementById('leds');
+
+      for (let i = 1; i <= ledCount; i++) {
+        const card = document.createElement('div');
+        card.className = 'led-card';
+        card.innerHTML = `
+          <h2>LED ${i}</h2>
+          <label>ON:</label><input type="time" id="on${i}"><br>
+          <label>OFF:</label><input type="time" id="off${i}"><br>
+          <label>Intensity:</label><input type="number" id="intensity${i}" min="0" max="255"><br>
+          <button onclick="submitData(${i})">Send</button>
+          <div class="status" id="msg${i}">Status: --</div>
+          <div class="sensor" id="sensor${i}">Light: --</div>
+        `;
+        container.appendChild(card);
+      }
+
+      refreshStatus();
+      setInterval(refreshStatus, 5000);
+    }
+
     function submitData(ledNum) {
       const on = document.getElementById(`on${ledNum}`).value;
       const off = document.getElementById(`off${ledNum}`).value;
       const intensity = document.getElementById(`intensity${ledNum}`).value;
       const msg = document.getElementById(`msg${ledNum}`);
 
-      if (!on || !off || intensity === '') return alert('Please enter all fields');
+      if (!on || !off || intensity === '') return alert('Please fill all fields');
 
       const data = `${on},${off},${intensity}`;
       fetch(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field${ledNum}=${encodeURIComponent(data)}`)
         .then(res => res.text())
-        .then(v => msg.innerText = parseInt(v) > 0 ? 'Status: ✔ Updated' : 'Status: ✘ Failed')
-        .catch(() => msg.innerText = 'Status: ✘ Network Error');
+        .then(val => msg.innerText = parseInt(val) > 0 ? 'Status: ✔ Updated' : 'Status: ✘ Failed')
+        .catch(() => msg.innerText = 'Status: ✘ Network Err');
     }
 
-    // Fetch latest ON/OFF/Intensity & sensor values
     async function refreshStatus() {
       for (let i = 1; i <= ledCount; i++) {
-        // Fetch settings
         try {
           const res = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i}/last.json?api_key=${readAPIKey}`);
           const js = await res.json();
-          const val = js[`field${i}`] || 'N/A';
-          statusData[i] = val; 
+          const val = js[`field${i}`] || '--';
           document.getElementById(`msg${i}`).innerText = 'Status: ' + val;
         } catch {
-          document.getElementById(`msg${i}`).innerText = 'Status: ✘ Fetch Err';
+          document.getElementById(`msg${i}`).innerText = 'Status: ✘ Error';
         }
 
-        // Fetch sensor: assume sensor is on field i+4
         try {
           const res2 = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i + 4}/last.json?api_key=${readAPIKey}`);
           const js2 = await res2.json();
-          const sens = js2[`field${i+4}`] || 'N/A';
-          document.getElementById(`sensor${i}`).innerText = 'Light: ' + sens;
+          const val2 = js2[`field${i + 4}`] || '--';
+          document.getElementById(`sensor${i}`).innerText = 'Light: ' + val2;
         } catch {
-          document.getElementById(`sensor${i}`).innerText = 'Light: ✘ Fetch Err';
+          document.getElementById(`sensor${i}`).innerText = 'Light: ✘';
         }
       }
     }
-
-    // Initial load & periodic updates
-    refreshStatus();
-    setInterval(refreshStatus, 5000);
   </script>
 </body>
 </html>
