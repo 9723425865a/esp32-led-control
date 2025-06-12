@@ -139,6 +139,13 @@
       2500: 142, 3000: 172, 3500: 208, 4000: 240
     };
 
+    function getIntensityFromPWM(pwm) {
+      for (let key in intensityMap) {
+        if (intensityMap[key] == pwm) return key;
+      }
+      return "--";
+    }
+
     function login() {
       const u = document.getElementById("username").value;
       const p = document.getElementById("password").value;
@@ -244,6 +251,7 @@
           const js = await res.json();
           const val = js[`field${i}`] || '';
           const [onTime, offTime, intensity] = val.split(",") || ["--", "--", "0"];
+          const userSelectedIntensity = getIntensityFromPWM(parseInt(intensity));
 
           const [onH, onM] = onTime.split(":").map(Number);
           const [offH, offM] = offTime.split(":").map(Number);
@@ -252,8 +260,8 @@
           const inRange = onMin <= currentMinutes && currentMinutes < offMin && parseInt(intensity) > 0;
 
           document.getElementById(`msg${i}`).innerText = `Status: ${inRange ? "LED ON" : "LED OFF"}`;
-          document.getElementById(`lastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${intensity}`;
-          document.getElementById(`statusLastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${intensity}`;
+          document.getElementById(`lastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${userSelectedIntensity}`;
+          document.getElementById(`statusLastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${userSelectedIntensity}`;
 
           const ledIndicator = document.getElementById(`ledStatus${i}`);
           const ledTextStatus = document.getElementById(`ledTextStatus${i}`);
