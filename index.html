@@ -81,16 +81,21 @@
       margin-top: 10px;
     }
 
-    .led-indicator {
-      width: 15px;
-      height: 15px;
+    .led-ring {
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
       display: inline-block;
       margin-right: 8px;
+      background: #ccc;
+      box-shadow: none;
+      transition: background 0.3s, box-shadow 0.3s;
     }
 
-    .on { background-color: green; }
-    .off { background-color: red; }
+    .led-on {
+      background: #00ff00;
+      box-shadow: 0 0 8px #00ff00, 0 0 15px #00ff00;
+    }
 
     #logout {
       margin-top: 20px;
@@ -117,7 +122,6 @@
   </style>
 </head>
 <body>
-
   <div class="login-box" id="loginBox" style="display:block;">
     <h2 style="text-align: center;">🔐 Secure Login</h2>
     <input type="text" id="username" placeholder="Username">
@@ -132,12 +136,8 @@
     <button onclick="showPage('dashboard')">⚙️ Settings</button>
   </div>
 
-  <!-- NEW: STATUS PAGE -->
   <div id="statusPage" class="status-page"></div>
-
-  <!-- EXISTING DASHBOARD PAGE -->
   <div id="dashboard" class="dashboard" style="flex-wrap:wrap;"></div>
-
   <button id="logout" style="display:none;" onclick="logout()">🚪 Logout</button>
 
   <script>
@@ -210,7 +210,7 @@
         const card = document.createElement("div");
         card.className = "led-card";
         card.innerHTML = `
-          <h3>LED ${i} Status <span class="led-indicator" id="ledStatus${i}"></span></h3>
+          <h3>LED ${i} Status <span class="led-ring" id="ledStatus${i}"></span></h3>
           <div id="sensorMeter${i}">Light Value: <strong id="meterVal${i}">--</strong></div>
           <canvas id="canvas${i}" width="100" height="100"></canvas>
         `;
@@ -242,10 +242,11 @@
           const js = await res.json();
           const val = js[`field${i}`] || '';
           document.getElementById(`msg${i}`).innerText = `Status: ${val}`;
-          document.getElementById(`ledStatus${i}`).className = `led-indicator ${(val.includes("ON") || val.includes("on")) ? "on" : "off"}`;
+          const ledElem = document.getElementById(`ledStatus${i}`);
+          ledElem.className = `led-ring ${(val.includes("ON") || val.includes("on")) ? "led-on" : ""}`;
         } catch {
           document.getElementById(`msg${i}`).innerText = `Status: ❌ Fetch Error`;
-          document.getElementById(`ledStatus${i}`).className = `led-indicator off`;
+          document.getElementById(`ledStatus${i}`).className = "led-ring";
         }
 
         try {
