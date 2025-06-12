@@ -31,6 +31,8 @@
       max-width: 1000px;
       display: none;
       transition: all 0.3s ease;
+      flex-wrap: wrap;
+      justify-content: center;
     }
 
     .led-card {
@@ -41,10 +43,26 @@
       box-shadow: 0 0 10px #ccc;
       margin: 10px;
       transition: 0.3s;
+      position: relative;
     }
 
     .led-card:hover {
       transform: scale(1.02);
+    }
+
+    .led-glow {
+      border: 3px solid transparent;
+      animation: glow 1s infinite alternate;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.6);
+    }
+
+    @keyframes glow {
+      from {
+        box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+      }
+      to {
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.9);
+      }
     }
 
     label {
@@ -81,22 +99,6 @@
       margin-top: 10px;
     }
 
-    .led-ring {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 8px;
-      background: #ccc;
-      box-shadow: none;
-      transition: background 0.3s, box-shadow 0.3s;
-    }
-
-    .led-on {
-      background: #00ff00;
-      box-shadow: 0 0 8px #00ff00, 0 0 15px #00ff00;
-    }
-
     #logout {
       margin-top: 20px;
       background: #dc3545;
@@ -122,6 +124,7 @@
   </style>
 </head>
 <body>
+
   <div class="login-box" id="loginBox" style="display:block;">
     <h2 style="text-align: center;">🔐 Secure Login</h2>
     <input type="text" id="username" placeholder="Username">
@@ -136,8 +139,12 @@
     <button onclick="showPage('dashboard')">⚙️ Settings</button>
   </div>
 
+  <!-- STATUS PAGE -->
   <div id="statusPage" class="status-page"></div>
-  <div id="dashboard" class="dashboard" style="flex-wrap:wrap;"></div>
+
+  <!-- SETTINGS DASHBOARD -->
+  <div id="dashboard" class="dashboard"></div>
+
   <button id="logout" style="display:none;" onclick="logout()">🚪 Logout</button>
 
   <script>
@@ -209,8 +216,9 @@
       for (let i = 1; i <= ledCount; i++) {
         const card = document.createElement("div");
         card.className = "led-card";
+        card.id = `ledCard${i}`;
         card.innerHTML = `
-          <h3>LED ${i} Status <span class="led-ring" id="ledStatus${i}"></span></h3>
+          <h3>LED ${i} Status</h3>
           <div id="sensorMeter${i}">Light Value: <strong id="meterVal${i}">--</strong></div>
           <canvas id="canvas${i}" width="100" height="100"></canvas>
         `;
@@ -241,12 +249,14 @@
           const res = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i}/last.json?api_key=${readAPIKey}`);
           const js = await res.json();
           const val = js[`field${i}`] || '';
-          document.getElementById(`msg${i}`).innerText = `Status: ${val}`;
-          const ledElem = document.getElementById(`ledStatus${i}`);
-          ledElem.className = `led-ring ${(val.includes("ON") || val.includes("on")) ? "led-on" : ""}`;
+          const card = document.getElementById(`ledCard${i}`);
+          if (val.toLowerCase().includes("on")) {
+            card.classList.add("led-glow");
+          } else {
+            card.classList.remove("led-glow");
+          }
         } catch {
-          document.getElementById(`msg${i}`).innerText = `Status: ❌ Fetch Error`;
-          document.getElementById(`ledStatus${i}`).className = "led-ring";
+          // Skip if error
         }
 
         try {
@@ -254,11 +264,9 @@
           const sensor = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${fieldNum}/last.json?api_key=${readAPIKey}`);
           const js2 = await sensor.json();
           const val2 = js2[`field${fieldNum}`] || '0';
-          document.getElementById(`sensor${i}`).innerText = `Light: ${val2}`;
           document.getElementById(`meterVal${i}`).innerText = val2;
           drawMeter(`canvas${i}`, parseInt(val2));
         } catch {
-          document.getElementById(`sensor${i}`).innerText = "Light: ❌";
           document.getElementById(`meterVal${i}`).innerText = "--";
         }
       }
