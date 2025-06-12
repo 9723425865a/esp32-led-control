@@ -153,6 +153,17 @@
     const readAPIKey = "PEE1E04AXJGZOILT";
     const ledCount = 4;
 
+    const intensityMap = {
+      500: 20,
+      1000: 50,
+      1500: 82,
+      2000: 111,
+      2500: 142,
+      3000: 172,
+      3500: 208,
+      4000: 240
+    };
+
     function login() {
       const u = document.getElementById("username").value;
       const p = document.getElementById("password").value;
@@ -189,6 +200,10 @@
         const card = document.createElement("div");
         card.className = "led-card";
         card.id = `card${i}`;
+
+        const options = Object.keys(intensityMap).map(val =>
+          `<option value="${val}">${val}</option>`).join("");
+
         card.innerHTML = `
           <h3>LED ${i}</h3>
           <label>On Time</label>
@@ -197,11 +212,12 @@
           <input type="time" id="off${i}">
           <label>Intensity</label>
           <select id="intensity${i}">
-            ${[0, 50, 100, 150, 200, 255].map(val => `<option value="${val}">${val}</option>`).join("")}
+            ${options}
           </select>
           <button onclick="submitData(${i})">🚀 Update</button>
           <div class="status" id="msg${i}">Status: --</div>
           <div class="sensor" id="sensor${i}">Light: --</div>
+          <div class="status" id="lastSetting${i}">Last Setting: --</div>
         `;
         dash.appendChild(card);
       }
@@ -209,31 +225,17 @@
       setInterval(fetchStatus, 5000);
     }
 
-    function buildStatusPage() {
-      const status = document.getElementById("statusPage");
-      status.innerHTML = '';
-      for (let i = 1; i <= ledCount; i++) {
-        const card = document.createElement("div");
-        card.className = "led-card";
-        card.id = `card${i}`;
-        card.innerHTML = `
-          <h3>LED ${i} Status <span class="led-indicator" id="ledStatus${i}"></span></h3>
-          <div id="sensorMeter${i}">Light Value: <strong id="meterVal${i}">--</strong></div>
-          <canvas id="canvas${i}" width="100" height="100"></canvas>
-        `;
-        status.appendChild(card);
-      }
-    }
-
     function submitData(i) {
       const on = document.getElementById(`on${i}`).value;
       const off = document.getElementById(`off${i}`).value;
-      const intensity = document.getElementById(`intensity${i}`).value;
+      const userIntensity = document.getElementById(`intensity${i}`).value;
       const msg = document.getElementById(`msg${i}`);
 
-      if (!on || !off || intensity === '') return alert("All fields required!");
+      if (!on || !off || userIntensity === '') return alert("All fields required!");
 
-      const value = `${on},${off},${intensity}`;
+      const actualPWM = intensityMap[userIntensity] || 0;
+      const value = `${on},${off},${actualPWM}`;
+
       fetch(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field${i}=${encodeURIComponent(value)}`)
         .then(res => res.text())
         .then(response => {
@@ -248,20 +250,32 @@
           const res = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i}/last.json?api_key=${readAPIKey}`);
           const js = await res.json();
           const val = js[`field${i}`] || '';
-          document.getElementById(`msg${i}`).innerText = `Status: ${val}`;
+          const [onTime, offTime, intensity] = val.split(",");
+          const isOn = parseInt(intensity) > 0;
 
-          const isOn = val.toLowerCase().includes("on");
-          document.getElementById(`ledStatus${i}`).className = `led-indicator ${isOn ? "on" : "off"}`;
+          document.getElementById(`msg${i}`).innerText = `Status: ${isOn ? "LED ON" : "LED OFF"}`;
+          document.getElementById(`lastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${intensity}`;
+          document.getElementById(`statusLastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${intensity}`;
+
+          const ledIndicator = document.getElementById(`ledStatus${i}`);
+          const ledTextStatus = document.getElementById(`ledTextStatus${i}`);
+
+          if (ledIndicator) {
+            ledIndicator.className = `led-indicator ${isOn ? "on" : "off"}`;
+          }
+          if (ledTextStatus) {
+            ledTextStatus.textContent = `Status: LED ${isOn ? "ON" : "OFF"}`;
+          }
 
           const card = document.getElementById(`card${i}`);
           if (card) {
             card.classList.remove("card-on", "card-off");
             card.classList.add(isOn ? "card-on" : "card-off");
           }
-
         } catch {
           document.getElementById(`msg${i}`).innerText = `Status: ❌ Fetch Error`;
-          document.getElementById(`ledStatus${i}`).className = `led-indicator off`;
+          const ledIndicator = document.getElementById(`ledStatus${i}`);
+          if (ledIndicator) ledIndicator.className = `led-indicator off`;
         }
 
         try {
@@ -276,6 +290,24 @@
           document.getElementById(`sensor${i}`).innerText = "Light: ❌";
           document.getElementById(`meterVal${i}`).innerText = "--";
         }
+      }
+    }
+
+    function buildStatusPage() {
+      const status = document.getElementById("statusPage");
+      status.innerHTML = '';
+      for (let i = 1; i <= ledCount; i++) {
+        const card = document.createElement("div");
+        card.className = "led-card";
+        card.id = `statusCard${i}`;
+        card.innerHTML = `
+          <h3>LED ${i} Status <span class="led-indicator" id="ledStatus${i}"></span></h3>
+          <div id="ledTextStatus${i}" style="font-weight:bold; font-size:16px; margin-bottom:8px;">Status: --</div>
+          <div id="sensorMeter${i}">Light Value: <strong id="meterVal${i}">--</strong></div>
+          <div class="status" id="statusLastSetting${i}">Last Setting: --</div>
+          <canvas id="canvas${i}" width="100" height="100"></canvas>
+        `;
+        status.appendChild(card);
       }
     }
 
