@@ -47,12 +47,14 @@
       transform: scale(1.02);
     }
 
-    .led-on {
+    .card-on {
       background-color: #d4edda !important;
+      border: 2px solid #28a745;
     }
 
-    .led-off {
+    .card-off {
       background-color: #f8d7da !important;
+      border: 2px solid #dc3545;
     }
 
     label {
@@ -248,13 +250,13 @@
           const val = js[`field${i}`] || '';
           document.getElementById(`msg${i}`).innerText = `Status: ${val}`;
 
-          const isOn = val.includes("ON") || val.includes("on");
+          const isOn = val.toLowerCase().includes("on");
           document.getElementById(`ledStatus${i}`).className = `led-indicator ${isOn ? "on" : "off"}`;
 
           const card = document.getElementById(`card${i}`);
           if (card) {
-            card.classList.remove("led-on", "led-off");
-            card.classList.add(isOn ? "led-on" : "led-off");
+            card.classList.remove("card-on", "card-off");
+            card.classList.add(isOn ? "card-on" : "card-off");
           }
 
         } catch {
