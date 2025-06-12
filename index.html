@@ -15,13 +15,11 @@
       align-items: center;
       padding: 20px;
     }
-
     h1 {
       margin-bottom: 30px;
       font-size: 32px;
       color: #00557f;
     }
-
     .login-box, .dashboard, .status-page {
       background: rgba(255, 255, 255, 0.9);
       border-radius: 12px;
@@ -32,7 +30,6 @@
       display: none;
       transition: all 0.3s ease;
     }
-
     .led-card {
       background: white;
       border-radius: 12px;
@@ -42,26 +39,21 @@
       margin: 10px;
       transition: 0.3s;
     }
-
     .led-card:hover {
       transform: scale(1.02);
     }
-
     .card-on {
       background-color: #d4edda !important;
       border: 2px solid #28a745;
     }
-
     .card-off {
       background-color: #f8d7da !important;
       border: 2px solid #dc3545;
     }
-
     label {
       display: block;
       margin-top: 10px;
     }
-
     input, select {
       width: 100%;
       padding: 6px;
@@ -69,7 +61,6 @@
       border-radius: 6px;
       border: 1px solid #ccc;
     }
-
     button {
       margin-top: 15px;
       padding: 10px;
@@ -81,16 +72,13 @@
       font-weight: bold;
       transition: background 0.3s ease;
     }
-
     button:hover {
       background-color: #0056b3;
     }
-
     .status, .sensor {
       font-size: 14px;
       margin-top: 10px;
     }
-
     .led-indicator {
       width: 15px;
       height: 15px;
@@ -98,31 +86,24 @@
       display: inline-block;
       margin-right: 8px;
     }
-
     .on { background-color: green; }
     .off { background-color: red; }
-
     #logout {
       margin-top: 20px;
       background: #dc3545;
     }
-
     .nav-buttons {
       display: flex;
       gap: 10px;
       margin-bottom: 20px;
     }
-
     canvas {
       margin-top: 10px;
       width: 100px;
       height: 100px;
     }
-
     @media screen and (max-width: 600px) {
-      .led-card {
-        width: 90%;
-      }
+      .led-card { width: 90%; }
     }
   </style>
 </head>
@@ -154,14 +135,8 @@
     const ledCount = 4;
 
     const intensityMap = {
-      500: 20,
-      1000: 50,
-      1500: 82,
-      2000: 111,
-      2500: 142,
-      3000: 172,
-      3500: 208,
-      4000: 240
+      500: 20, 1000: 50, 1500: 82, 2000: 111,
+      2500: 142, 3000: 172, 3500: 208, 4000: 240
     };
 
     function login() {
@@ -172,12 +147,12 @@
       if (u === allowedUser && p === allowedPass) {
         document.getElementById("loginBox").style.display = "none";
         document.getElementById("panelTitle").style.display = "block";
-        document.getElementById("dashboard").style.display = "none";
         document.getElementById("statusPage").style.display = "flex";
         document.getElementById("navButtons").style.display = "flex";
         document.getElementById("logout").style.display = "inline-block";
         buildDashboard();
         buildStatusPage();
+        setInterval(fetchStatus, 5000);
       } else {
         msg.textContent = "Invalid credentials!";
       }
@@ -221,15 +196,30 @@
         `;
         dash.appendChild(card);
       }
-      fetchStatus();
-      setInterval(fetchStatus, 5000);
+    }
+
+    function buildStatusPage() {
+      const status = document.getElementById("statusPage");
+      status.innerHTML = '';
+      for (let i = 1; i <= ledCount; i++) {
+        const card = document.createElement("div");
+        card.className = "led-card";
+        card.id = `statusCard${i}`;
+        card.innerHTML = `
+          <h3>LED ${i} Status <span class="led-indicator" id="ledStatus${i}"></span></h3>
+          <div id="ledTextStatus${i}" style="font-weight:bold;">Status: --</div>
+          <div id="sensorMeter${i}">Light Value: <strong id="meterVal${i}">--</strong></div>
+          <div class="status" id="statusLastSetting${i}">Last Setting: --</div>
+          <canvas id="canvas${i}" width="100" height="100"></canvas>
+        `;
+        status.appendChild(card);
+      }
     }
 
     function submitData(i) {
       const on = document.getElementById(`on${i}`).value;
       const off = document.getElementById(`off${i}`).value;
       const userIntensity = document.getElementById(`intensity${i}`).value;
-      const msg = document.getElementById(`msg${i}`);
 
       if (!on || !off || userIntensity === '') return alert("All fields required!");
 
@@ -239,43 +229,49 @@
       fetch(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field${i}=${encodeURIComponent(value)}`)
         .then(res => res.text())
         .then(response => {
-          msg.innerText = parseInt(response) > 0 ? "Status: ✅ Updated" : "Status: ❌ Error";
+          document.getElementById(`msg${i}`).innerText = parseInt(response) > 0 ? "Status: ✅ Updated" : "Status: ❌ Error";
         })
-        .catch(() => msg.innerText = "Status: ❌ Network Error");
+        .catch(() => document.getElementById(`msg${i}`).innerText = "Status: ❌ Network Error");
     }
 
     async function fetchStatus() {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
       for (let i = 1; i <= ledCount; i++) {
         try {
           const res = await fetch(`https://api.thingspeak.com/channels/${channelID}/fields/${i}/last.json?api_key=${readAPIKey}`);
           const js = await res.json();
           const val = js[`field${i}`] || '';
-          const [onTime, offTime, intensity] = val.split(",");
-          const isOn = parseInt(intensity) > 0;
+          const [onTime, offTime, intensity] = val.split(",") || ["--", "--", "0"];
 
-          document.getElementById(`msg${i}`).innerText = `Status: ${isOn ? "LED ON" : "LED OFF"}`;
+          const [onH, onM] = onTime.split(":").map(Number);
+          const [offH, offM] = offTime.split(":").map(Number);
+          const onMin = onH * 60 + onM;
+          const offMin = offH * 60 + offM;
+          const inRange = onMin <= currentMinutes && currentMinutes < offMin && parseInt(intensity) > 0;
+
+          document.getElementById(`msg${i}`).innerText = `Status: ${inRange ? "LED ON" : "LED OFF"}`;
           document.getElementById(`lastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${intensity}`;
           document.getElementById(`statusLastSetting${i}`).innerText = `Last Setting: ON ${onTime}, OFF ${offTime}, Intensity ${intensity}`;
 
           const ledIndicator = document.getElementById(`ledStatus${i}`);
           const ledTextStatus = document.getElementById(`ledTextStatus${i}`);
-
-          if (ledIndicator) {
-            ledIndicator.className = `led-indicator ${isOn ? "on" : "off"}`;
-          }
-          if (ledTextStatus) {
-            ledTextStatus.textContent = `Status: LED ${isOn ? "ON" : "OFF"}`;
-          }
+          if (ledIndicator) ledIndicator.className = `led-indicator ${inRange ? "on" : "off"}`;
+          if (ledTextStatus) ledTextStatus.textContent = `Status: LED ${inRange ? "ON" : "OFF"}`;
 
           const card = document.getElementById(`card${i}`);
+          const statusCard = document.getElementById(`statusCard${i}`);
           if (card) {
             card.classList.remove("card-on", "card-off");
-            card.classList.add(isOn ? "card-on" : "card-off");
+            card.classList.add(inRange ? "card-on" : "card-off");
+          }
+          if (statusCard) {
+            statusCard.classList.remove("card-on", "card-off");
+            statusCard.classList.add(inRange ? "card-on" : "card-off");
           }
         } catch {
-          document.getElementById(`msg${i}`).innerText = `Status: ❌ Fetch Error`;
-          const ledIndicator = document.getElementById(`ledStatus${i}`);
-          if (ledIndicator) ledIndicator.className = `led-indicator off`;
+          document.getElementById(`msg${i}`).innerText = "Status: ❌ Fetch Error";
         }
 
         try {
@@ -290,24 +286,6 @@
           document.getElementById(`sensor${i}`).innerText = "Light: ❌";
           document.getElementById(`meterVal${i}`).innerText = "--";
         }
-      }
-    }
-
-    function buildStatusPage() {
-      const status = document.getElementById("statusPage");
-      status.innerHTML = '';
-      for (let i = 1; i <= ledCount; i++) {
-        const card = document.createElement("div");
-        card.className = "led-card";
-        card.id = `statusCard${i}`;
-        card.innerHTML = `
-          <h3>LED ${i} Status <span class="led-indicator" id="ledStatus${i}"></span></h3>
-          <div id="ledTextStatus${i}" style="font-weight:bold; font-size:16px; margin-bottom:8px;">Status: --</div>
-          <div id="sensorMeter${i}">Light Value: <strong id="meterVal${i}">--</strong></div>
-          <div class="status" id="statusLastSetting${i}">Last Setting: --</div>
-          <canvas id="canvas${i}" width="100" height="100"></canvas>
-        `;
-        status.appendChild(card);
       }
     }
 
